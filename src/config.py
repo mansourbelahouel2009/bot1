@@ -6,6 +6,9 @@ class Config:
     API_KEY = os.getenv('BINANCE_API_KEY', '')
     API_SECRET = os.getenv('BINANCE_API_SECRET', '')
 
+    # Use Binance Testnet
+    USE_TESTNET = True
+
     # News API credentials
     NEWS_API_KEY = os.getenv('NEWS_API_KEY', '')
 

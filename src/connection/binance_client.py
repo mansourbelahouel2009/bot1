@@ -11,15 +11,31 @@ class BinanceClient:
     def initialize_client(self) -> None:
         """Initialize Binance API client using ccxt"""
         try:
-            self.client = ccxt.binance({
+            options = {
                 'apiKey': Config.API_KEY,
                 'secret': Config.API_SECRET,
                 'enableRateLimit': True,
                 'options': {
                     'defaultType': 'spot'
                 }
-            })
-            logging.info("Successfully connected to Binance API using ccxt")
+            }
+
+            if Config.USE_TESTNET:
+                options['urls'] = {
+                    'api': {
+                        'public': 'https://testnet.binance.vision/api/v3',
+                        'private': 'https://testnet.binance.vision/api/v3',
+                    }
+                }
+                logging.info("Connecting to Binance Testnet")
+
+            self.client = ccxt.binance(options)
+
+            if Config.USE_TESTNET:
+                self.client.set_sandbox_mode(True)
+
+            logging.info("Successfully connected to Binance API")
+
         except Exception as e:
             logging.error(f"Failed to connect to Binance API: {e}")
             raise

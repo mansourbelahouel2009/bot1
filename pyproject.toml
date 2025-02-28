@@ -7,9 +7,8 @@ dependencies = [
     "ccxt>=4.4.63",
     "matplotlib>=3.10.1",
     "mplfinance>=0.12.10b0",
-    "numpy>=2.2.3",
     "pandas>=2.2.3",
     "python-binance>=1.0.28",
+    "requests>=2.32.3",
     "scikit-learn>=1.6.1",
-    "tensorflow>=2.14.0",
 ]
