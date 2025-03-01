@@ -3,8 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List
 import logging
-from src.config import Config
-from src.trading.trade_manager import TradeManager
+from config import Config
+from trading.trade_manager import TradeManager
 
 class Dashboard:
     def __init__(self, trade_manager: TradeManager):
@@ -25,7 +25,7 @@ class Dashboard:
                 "اختر العملة",
                 [pair['symbol'] for pair in ranked_pairs]
             )
-            
+
             # خيار نوع التداول
             trading_mode = st.radio(
                 "نوع التداول",
@@ -40,21 +40,21 @@ class Dashboard:
 
         if selected_data:
             col1, col2 = st.columns([2, 1])
-            
+
             with col1:
                 st.subheader(f"تحليل {selected_symbol}")
                 self._render_price_chart(selected_data)
-                
+
             with col2:
                 self._render_analysis_details(selected_data)
-                
+
             if trading_mode == "تداول يدوي":
                 self._render_manual_trading_controls(selected_data)
 
     def _render_price_chart(self, data: Dict):
         """عرض الرسم البياني للسعر"""
         df = data['market_data']
-        
+
         fig = go.Figure(data=[
             go.Candlestick(
                 x=df.index,
@@ -64,13 +64,13 @@ class Dashboard:
                 close=df['close']
             )
         ])
-        
+
         fig.update_layout(
             title=f"سعر {data['symbol']}",
             yaxis_title="السعر",
             xaxis_title="التاريخ"
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
 
         if data.get('ml_prediction'):
@@ -84,7 +84,7 @@ class Dashboard:
             periods=2,
             freq='H'
         )
-        
+
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=last_prices.index,
@@ -97,31 +97,31 @@ class Dashboard:
             name="التوقع",
             line=dict(dash='dash')
         ))
-        
+
         fig.update_layout(
             title="توقع السعر",
             yaxis_title="السعر",
             xaxis_title="التاريخ"
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
 
     def _render_analysis_details(self, data: Dict):
         """عرض تفاصيل التحليل"""
         st.subheader("تفاصيل التحليل")
-        
+
         # المؤشرات الفنية
         tech_analysis = data['strategy_analysis']
         st.write("التحليل الفني:")
         st.write(f"- نوع الاتجاه: {tech_analysis.get('trend', 'غير محدد')}")
         st.write(f"- قوة الإشارة: {tech_analysis.get('signal_strength', 0):.2f}")
-        
+
         # تحليل الأخبار
         news = data['news_sentiment']
         st.write("تحليل الأخبار:")
         st.write(f"- التوجه: {news.get('sentiment', 'محايد')}")
         st.write(f"- درجة الثقة: {news.get('confidence', 0):.2f}")
-        
+
         # توقع التعلم الآلي
         if data.get('ml_prediction'):
             st.write("توقع التعلم الآلي:")
@@ -134,20 +134,20 @@ class Dashboard:
     def _render_manual_trading_controls(self, data: Dict):
         """عرض أدوات التداول اليدوي"""
         st.subheader("التداول اليدوي")
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
             amount = st.number_input(
                 "كمية التداول",
                 min_value=0.0,
                 step=0.01
             )
-            
+
         with col2:
             available_balance = 10000  # يجب جلبه من الحساب
             st.write(f"الرصيد المتاح: {available_balance} USDT")
-        
+
         if st.button("شراء"):
             if amount > 0:
                 # تنفيذ أمر الشراء

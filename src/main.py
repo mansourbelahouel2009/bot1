@@ -3,8 +3,8 @@ import os
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List
-from visualization.dashboard import Dashboard
+from typing import Dict, List, Optional
+from datetime import datetime, timedelta
 import threading
 from connection.binance_client import BinanceClient
 from data.data_collector import DataCollector
@@ -12,20 +12,22 @@ from analysis.technical_analyzer import TechnicalAnalyzer
 from analysis.ml_analyzer import MLAnalyzer
 from analysis.news_analyzer import NewsAnalyzer
 from trading.strategy import TradingStrategy
-from trading.trader import Trader
 from trading.advanced_strategies import StrategySelector
 from visualization.chart_manager import ChartManager
+from visualization.dashboard import Dashboard
 from config import Config
 from database.models import DatabaseManager
 from trading.trade_manager import TradeManager
-from datetime import datetime, timedelta
-
 
 def setup_logging():
     """إعداد التسجيل"""
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('trading_bot.log')
+        ]
     )
 
 class TradingBot:
@@ -58,26 +60,52 @@ class TradingBot:
     def initialize(self):
         """تهيئة روبوت التداول"""
         logging.info("بدء تهيئة روبوت التداول...")
+        try:
+            # تصفية أزواج التداول بناءً على الحجم
+            self._filter_trading_pairs()
 
-        # تصفية أزواج التداول بناءً على الحجم
-        self._filter_trading_pairs()
+            # تحليل العملات النشطة
+            active_pairs = [pair for pair, active in self.active_pairs.items() if active]
+            market_data = self.data_collector.fetch_multiple_symbols(
+                active_pairs, Config.TIMEFRAME
+            )
 
-        # تحليل العملات النشطة
-        active_pairs = [pair for pair, active in self.active_pairs.items() if active]
-        market_data = self.data_collector.fetch_multiple_symbols(
-            active_pairs, Config.TIMEFRAME
-        )
+            # تدريب نموذج التعلم الآلي وتحليل الأخبار
+            for symbol, df in market_data.items():
+                try:
+                    self.ml_analyzer.train_model(df)
+                    self.news_analyzer.get_market_sentiment(symbol)
+                    logging.info(f"تم تهيئة {symbol} بنجاح")
+                except Exception as e:
+                    logging.error(f"خطأ في تهيئة {symbol}: {e}")
+                    self.active_pairs[symbol] = False
 
-        # تدريب نموذج التعلم الآلي وتحليل الأخبار
-        for symbol, df in market_data.items():
-            try:
-                X, y = self.ml_analyzer.prepare_data(df)
-                self.ml_analyzer.train_model(X, y)
-                self.news_analyzer.get_market_sentiment(symbol)
-                logging.info(f"تم تهيئة {symbol} بنجاح")
-            except Exception as e:
-                logging.error(f"خطأ في تهيئة {symbol}: {e}")
-                self.active_pairs[symbol] = False
+            # تحليل وترتيب العملات
+            self.ranked_pairs = self.rank_trading_pairs()
+            logging.info("تم تهيئة النظام بنجاح")
+
+        except Exception as e:
+            logging.error(f"خطأ في تهيئة النظام: {e}")
+            raise
+
+    def start_dashboard(self):
+        """تشغيل واجهة المستخدم"""
+        try:
+            logging.info("بدء تشغيل واجهة المستخدم")
+
+            # تحليل وترتيب العملات قبل عرض لوحة التحكم
+            if not self.ranked_pairs:
+                self.ranked_pairs = self.rank_trading_pairs()
+                logging.info("تم تحليل وترتيب العملات بنجاح")
+
+            # تشغيل لوحة التحكم
+            import streamlit as st
+            st.set_page_config(page_title="نظام التداول الآلي", layout="wide")
+            self.dashboard.render_main_page(self.ranked_pairs)
+
+        except Exception as e:
+            logging.error(f"خطأ في تشغيل لوحة التحكم: {e}")
+            raise
 
     def _filter_trading_pairs(self):
         """تصفية أزواج التداول بناءً على الحجم"""
@@ -91,7 +119,7 @@ class TradingBot:
                 logging.error(f"خطأ في فحص حجم التداول لـ {symbol}: {e}")
                 self.active_pairs[symbol] = False
 
-    def _analyze_trading_pair(self, symbol: str) -> Dict:
+    def _analyze_trading_pair(self, symbol: str) -> Optional[Dict]:
         """تحليل زوج تداول واحد"""
         try:
             # جمع وتحليل البيانات
@@ -136,8 +164,8 @@ class TradingBot:
         ranked_pairs = sorted(
             analysis_results,
             key=lambda x: (
-                x['strategy_analysis']['signal_strength'] if x['strategy_analysis'] else 0,
-                abs(x['news_sentiment']['sentiment_score']) if x['news_sentiment'] else 0
+                x['strategy_analysis']['signal_strength'] if x.get('strategy_analysis') else 0,
+                abs(x['news_sentiment']['sentiment_score']) if x.get('news_sentiment') else 0
             ),
             reverse=True
         )
@@ -145,18 +173,10 @@ class TradingBot:
         self.ranked_pairs = ranked_pairs
         return ranked_pairs
 
-    def start_dashboard(self):
-        """تشغيل واجهة المستخدم"""
-        import streamlit as st
-        self.dashboard.render_main_page(self.ranked_pairs)
 
     def run(self, automatic_trading: bool = True):
         """تشغيل روبوت التداول"""
         logging.info("بدء تشغيل روبوت التداول...")
-
-        # تشغيل واجهة المستخدم في thread منفصل
-        dashboard_thread = threading.Thread(target=self.start_dashboard)
-        dashboard_thread.start()
 
         while True:
             try:
@@ -205,7 +225,7 @@ class TradingBot:
 
     def _should_generate_report(self) -> bool:
         """التحقق مما إذا كان يجب إنشاء تقرير يومي"""
-        current_hour = time.localtime().tm_hour
+        current_hour = datetime.now().hour
         return current_hour == 0  # إنشاء تقرير عند منتصف الليل
 
     def _generate_daily_report(self):
@@ -240,16 +260,30 @@ class TradingBot:
         except Exception as e:
             logging.error(f"خطأ في إنشاء التقرير اليومي: {e}")
 
-if __name__ == "__main__":
+def run_dashboard():
+    """تشغيل لوحة التحكم بشكل مستقل"""
     try:
+        logging.info("بدء تشغيل وضع لوحة التحكم")
         bot = TradingBot()
         bot.initialize()
-        if len(sys.argv) > 1 and sys.argv[1] == '--dashboard-only':
-            # تشغيل لوحة التحكم فقط
-            import streamlit as st
-            bot.dashboard.render_main_page(bot.ranked_pairs)
-        else:
-            # تشغيل النظام كاملاً
-            bot.run(automatic_trading=True)
+        bot.start_dashboard()
     except Exception as e:
-        logging.error(f"خطأ في تشغيل النظام: {e}")
+        logging.error(f"خطأ في تشغيل لوحة التحكم: {e}")
+        sys.exit(1)
+
+def run_trading_bot():
+    """تشغيل نظام التداول الكامل"""
+    try:
+        logging.info("بدء تشغيل نظام التداول الكامل")
+        bot = TradingBot()
+        bot.initialize()
+        bot.run(automatic_trading=True)
+    except Exception as e:
+        logging.error(f"خطأ في تشغيل نظام التداول: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--dashboard":
+        run_dashboard()
+    else:
+        run_trading_bot()

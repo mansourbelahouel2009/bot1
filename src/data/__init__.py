@@ -1,1 +1,4 @@
-# Initialize data package
+"""Initialize data package"""
+from .data_collector import DataCollector
+
+__all__ = ['DataCollector']
