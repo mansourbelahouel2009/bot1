@@ -1,8 +1,8 @@
 import ccxt
 import logging
 from typing import Dict, Optional
-from src.config import Config
-from src.connection.mock_data import MockBinanceData
+from config import Config
+from .mock_data import MockBinanceData
 
 class BinanceClient:
     def __init__(self):

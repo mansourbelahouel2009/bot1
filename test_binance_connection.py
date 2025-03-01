@@ -1,6 +1,6 @@
 import logging
-from src.connection.binance_client import BinanceClient
-from src.config import Config
+from connection.binance_client import BinanceClient
+from config import Config
 
 logging.basicConfig(level=logging.INFO)
 
