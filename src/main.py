@@ -5,7 +5,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-import threading
 from connection.binance_client import BinanceClient
 from data.data_collector import DataCollector
 from analysis.technical_analyzer import TechnicalAnalyzer
@@ -13,11 +12,9 @@ from analysis.ml_analyzer import MLAnalyzer
 from analysis.news_analyzer import NewsAnalyzer
 from trading.strategy import TradingStrategy
 from trading.advanced_strategies import StrategySelector
-from visualization.chart_manager import ChartManager
-from visualization.dashboard import Dashboard
+from trading.trade_manager import TradeManager
 from config import Config
 from database.models import DatabaseManager
-from trading.trade_manager import TradeManager
 
 def setup_logging():
     """إعداد التسجيل"""
@@ -47,11 +44,8 @@ class TradingBot:
             )
             self.strategy_selector = StrategySelector()
             self.trade_manager = TradeManager(self.binance_client, self.db_manager)
-            self.chart_manager = ChartManager()
-            self.active_pairs: Dict[str, bool] = {pair: True for pair in Config.TRADING_PAIRS}
-            self.executor = ThreadPoolExecutor(max_workers=len(Config.TRADING_PAIRS))
+            self.active_pairs = {pair: True for pair in Config.TRADING_PAIRS}
             self.ranked_pairs = []
-            self.dashboard = Dashboard(self.trade_manager)
             logging.info("تم تهيئة جميع المكونات بنجاح")
         except Exception as e:
             logging.error(f"خطأ في تهيئة النظام: {e}")
@@ -64,7 +58,7 @@ class TradingBot:
             # تصفية أزواج التداول بناءً على الحجم
             self._filter_trading_pairs()
 
-            # تحليل العملات النشطة
+            # تحليل العملات النشطة باستخدام Threading
             active_pairs = [pair for pair, active in self.active_pairs.items() if active]
             market_data = self.data_collector.fetch_multiple_symbols(
                 active_pairs, Config.TIMEFRAME
@@ -88,25 +82,6 @@ class TradingBot:
             logging.error(f"خطأ في تهيئة النظام: {e}")
             raise
 
-    def start_dashboard(self):
-        """تشغيل واجهة المستخدم"""
-        try:
-            logging.info("بدء تشغيل واجهة المستخدم")
-
-            # تحليل وترتيب العملات قبل عرض لوحة التحكم
-            if not self.ranked_pairs:
-                self.ranked_pairs = self.rank_trading_pairs()
-                logging.info("تم تحليل وترتيب العملات بنجاح")
-
-            # تشغيل لوحة التحكم
-            import streamlit as st
-            st.set_page_config(page_title="نظام التداول الآلي", layout="wide")
-            self.dashboard.render_main_page(self.ranked_pairs)
-
-        except Exception as e:
-            logging.error(f"خطأ في تشغيل لوحة التحكم: {e}")
-            raise
-
     def _filter_trading_pairs(self):
         """تصفية أزواج التداول بناءً على الحجم"""
         for symbol in Config.TRADING_PAIRS:
@@ -125,7 +100,7 @@ class TradingBot:
             # جمع وتحليل البيانات
             df = self.data_collector.fetch_historical_data(symbol, Config.TIMEFRAME)
             if df is not None:
-                df = self.data_collector.add_technical_indicators(df)
+                # المؤشرات الفنية واتجاه السوق مضافة تلقائياً من خلال DataCollector
 
                 # تحليل السوق وتحديد الاستراتيجية المناسبة
                 strategy_analysis = self.strategy_selector.select_strategy(df)
@@ -173,7 +148,6 @@ class TradingBot:
         self.ranked_pairs = ranked_pairs
         return ranked_pairs
 
-
     def run(self, automatic_trading: bool = True):
         """تشغيل روبوت التداول"""
         logging.info("بدء تشغيل روبوت التداول...")
@@ -197,17 +171,6 @@ class TradingBot:
 
                             if trade_result['success']:
                                 logging.info(f"تم تنفيذ التداول لـ {symbol}: {trade_result}")
-
-                                # تحديث الرسوم البيانية
-                                self.chart_manager.create_price_chart(
-                                    analysis['market_data'], symbol
-                                )
-                                if analysis['ml_prediction']:
-                                    self.chart_manager.create_prediction_chart(
-                                        analysis['market_data']['close'],
-                                        analysis['ml_prediction'],
-                                        symbol
-                                    )
 
                 # مراقبة المراكز المفتوحة
                 self.trade_manager.monitor_positions()
@@ -260,21 +223,10 @@ class TradingBot:
         except Exception as e:
             logging.error(f"خطأ في إنشاء التقرير اليومي: {e}")
 
-def run_dashboard():
-    """تشغيل لوحة التحكم بشكل مستقل"""
-    try:
-        logging.info("بدء تشغيل وضع لوحة التحكم")
-        bot = TradingBot()
-        bot.initialize()
-        bot.start_dashboard()
-    except Exception as e:
-        logging.error(f"خطأ في تشغيل لوحة التحكم: {e}")
-        sys.exit(1)
-
 def run_trading_bot():
-    """تشغيل نظام التداول الكامل"""
+    """تشغيل نظام التداول"""
     try:
-        logging.info("بدء تشغيل نظام التداول الكامل")
+        logging.info("بدء تشغيل نظام التداول")
         bot = TradingBot()
         bot.initialize()
         bot.run(automatic_trading=True)
@@ -283,7 +235,4 @@ def run_trading_bot():
         sys.exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--dashboard":
-        run_dashboard()
-    else:
-        run_trading_bot()
+    run_trading_bot()
