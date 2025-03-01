@@ -4,44 +4,56 @@ import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List
+from visualization.dashboard import Dashboard
+import threading
+from connection.binance_client import BinanceClient
+from data.data_collector import DataCollector
+from analysis.technical_analyzer import TechnicalAnalyzer
+from analysis.ml_analyzer import MLAnalyzer
+from analysis.news_analyzer import NewsAnalyzer
+from trading.strategy import TradingStrategy
+from trading.trader import Trader
+from trading.advanced_strategies import StrategySelector
+from visualization.chart_manager import ChartManager
+from config import Config
+from database.models import DatabaseManager
+from trading.trade_manager import TradeManager
+from datetime import datetime, timedelta
 
-# Add the project root directory to Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.connection.binance_client import BinanceClient
-from src.data.data_collector import DataCollector
-from src.analysis.technical_analyzer import TechnicalAnalyzer
-from src.analysis.ml_analyzer import MLAnalyzer
-from src.analysis.news_analyzer import NewsAnalyzer
-from src.trading.strategy import TradingStrategy
-from src.trading.trader import Trader
-from src.trading.advanced_strategies import StrategySelector
-from src.visualization.chart_manager import ChartManager
-from src.config import Config
-from src.database.models import DatabaseManager
-from src.trading.trade_manager import TradeManager
-
-logging.basicConfig(level=logging.INFO)
+def setup_logging():
+    """إعداد التسجيل"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
 
 class TradingBot:
     def __init__(self):
-        self.db_manager = DatabaseManager()
-        self.binance_client = BinanceClient()
-        self.data_collector = DataCollector(self.binance_client, self.db_manager)
-        self.technical_analyzer = TechnicalAnalyzer()
-        self.ml_analyzer = MLAnalyzer()
-        self.news_analyzer = NewsAnalyzer(self.db_manager)  # Update to use database manager
-        self.strategy = TradingStrategy(
-            self.technical_analyzer, 
-            self.ml_analyzer,
-            self.news_analyzer
-        )
-        self.strategy_selector = StrategySelector()
-        self.trade_manager = TradeManager(self.binance_client, self.db_manager)  # Add trade manager
-        self.chart_manager = ChartManager()
-        self.active_pairs: Dict[str, bool] = {pair: True for pair in Config.TRADING_PAIRS}
-        self.executor = ThreadPoolExecutor(max_workers=len(Config.TRADING_PAIRS))
-        self.ranked_pairs = []
+        setup_logging()
+        try:
+            self.db_manager = DatabaseManager()
+            self.binance_client = BinanceClient()
+            self.data_collector = DataCollector(self.binance_client, self.db_manager)
+            self.technical_analyzer = TechnicalAnalyzer()
+            self.ml_analyzer = MLAnalyzer()
+            self.news_analyzer = NewsAnalyzer(self.db_manager)
+            self.strategy = TradingStrategy(
+                self.technical_analyzer, 
+                self.ml_analyzer,
+                self.news_analyzer
+            )
+            self.strategy_selector = StrategySelector()
+            self.trade_manager = TradeManager(self.binance_client, self.db_manager)
+            self.chart_manager = ChartManager()
+            self.active_pairs: Dict[str, bool] = {pair: True for pair in Config.TRADING_PAIRS}
+            self.executor = ThreadPoolExecutor(max_workers=len(Config.TRADING_PAIRS))
+            self.ranked_pairs = []
+            self.dashboard = Dashboard(self.trade_manager)
+            logging.info("تم تهيئة جميع المكونات بنجاح")
+        except Exception as e:
+            logging.error(f"خطأ في تهيئة النظام: {e}")
+            raise
 
     def initialize(self):
         """تهيئة روبوت التداول"""
@@ -109,7 +121,7 @@ class TradingBot:
 
         except Exception as e:
             logging.error(f"خطأ في تحليل {symbol}: {e}")
-        return None
+            return None
 
     def rank_trading_pairs(self) -> List[Dict]:
         """ترتيب أزواج التداول بناءً على فرص التداول"""
@@ -133,9 +145,18 @@ class TradingBot:
         self.ranked_pairs = ranked_pairs
         return ranked_pairs
 
+    def start_dashboard(self):
+        """تشغيل واجهة المستخدم"""
+        import streamlit as st
+        self.dashboard.render_main_page(self.ranked_pairs)
+
     def run(self, automatic_trading: bool = True):
         """تشغيل روبوت التداول"""
         logging.info("بدء تشغيل روبوت التداول...")
+
+        # تشغيل واجهة المستخدم في thread منفصل
+        dashboard_thread = threading.Thread(target=self.start_dashboard)
+        dashboard_thread.start()
 
         while True:
             try:
@@ -149,7 +170,7 @@ class TradingBot:
                         strategy_analysis = analysis['strategy_analysis']
 
                         if strategy_analysis and strategy_analysis['signal_strength'] > 0.6:
-                            trade_result = self.trade_manager.execute_trade( # Use TradeManager
+                            trade_result = self.trade_manager.execute_trade(
                                 symbol=symbol,
                                 signal=strategy_analysis
                             )
@@ -169,7 +190,7 @@ class TradingBot:
                                     )
 
                 # مراقبة المراكز المفتوحة
-                self.trade_manager.monitor_positions() # Use TradeManager
+                self.trade_manager.monitor_positions()
 
                 # حفظ التقرير اليومي
                 if self._should_generate_report():
@@ -190,11 +211,8 @@ class TradingBot:
     def _generate_daily_report(self):
         """إنشاء تقرير يومي"""
         try:
-            today = time.strftime('%Y-%m-%d')
-            yesterday = time.strftime(
-                '%Y-%m-%d',
-                time.localtime(time.time() - 86400)
-            )
+            today = datetime.today()
+            yesterday = today - timedelta(days=1)
 
             # جمع بيانات التداول
             trades = self.db_manager.get_trades_report(
@@ -208,7 +226,7 @@ class TradingBot:
                 total_trades = len(trades)
 
                 report = {
-                    'date': today,
+                    'date': today.strftime('%Y-%m-%d'),
                     'total_trades': total_trades,
                     'win_rate': (win_trades / total_trades) * 100 if total_trades > 0 else 0,
                     'total_profit': total_profit,
@@ -223,6 +241,15 @@ class TradingBot:
             logging.error(f"خطأ في إنشاء التقرير اليومي: {e}")
 
 if __name__ == "__main__":
-    bot = TradingBot()
-    bot.initialize()
-    bot.run(automatic_trading=True)  # يمكن تغييرها إلى False للتداول اليدوي
+    try:
+        bot = TradingBot()
+        bot.initialize()
+        if len(sys.argv) > 1 and sys.argv[1] == '--dashboard-only':
+            # تشغيل لوحة التحكم فقط
+            import streamlit as st
+            bot.dashboard.render_main_page(bot.ranked_pairs)
+        else:
+            # تشغيل النظام كاملاً
+            bot.run(automatic_trading=True)
+    except Exception as e:
+        logging.error(f"خطأ في تشغيل النظام: {e}")
