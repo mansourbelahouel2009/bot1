@@ -21,4 +21,5 @@ dependencies = [
     "streamlit>=1.42.2",
     "textblob>=0.19.0",
     "plotly>=6.0.0",
+    "connection>=2021.7.20",
 ]
