@@ -5,4 +5,3 @@ from .advanced_strategies import StrategySelector
 from .trade_manager import TradeManager
 
 __all__ = ['TradingStrategy', 'Trader', 'StrategySelector', 'TradeManager']
-# تهيئة وحدة التداول

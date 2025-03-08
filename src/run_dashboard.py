@@ -61,13 +61,3 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Fatal error: {e}")
         sys.exit(1)
-import sys
-import os
-
-# إضافة المسار الحالي إلى مسار البحث
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.main import run_dashboard
-
-if __name__ == "__main__":
-    run_dashboard()
