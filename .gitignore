@@ -30,9 +30,17 @@ ENV/
 
 # Logs
 *.log
+logs/
 
 # Environment variables
 .env
+
+# MongoDB
+data/db/
+
+# Trading bot specific
+trading_bot.log
+dashboard.log
 
 # Replit specific
 .replit
