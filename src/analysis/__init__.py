@@ -12,3 +12,4 @@ __all__ = [
     'MLAnalyzer',
     'NewsAnalyzer'
 ]
+# تهيئة وحدة التحليلات
