@@ -1,14 +1,16 @@
-import requests
+
 import logging
-from typing import List, Dict, Optional
-from datetime import datetime, timedelta
-from textblob import TextBlob
+import requests
 import re
-from bs4 import BeautifulSoup
 import nltk
-from nltk.tokenize import sent_tokenize
-from src.config import Config
-from src.database.models import DatabaseManager
+from textblob import TextBlob
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+import json
+
+# تغيير استيراد النموذج من مطلق إلى نسبي
+from ..config import Config
+from ..database.models import DatabaseManager
 
 class EnhancedNewsAnalyzer:
     def __init__(self, db_manager: DatabaseManager):
@@ -126,7 +128,7 @@ class EnhancedNewsAnalyzer:
     def _split_long_text(self, text: str) -> str:
         """تقسيم النص الطويل إلى جمل"""
         try:
-            sentences = sent_tokenize(text)
+            sentences = nltk.sent_tokenize(text)
             total_length = 0
             selected_sentences = []
             
