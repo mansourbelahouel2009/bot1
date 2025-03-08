@@ -2,6 +2,52 @@
 
 نظام تداول آلي متعدد الطبقات يستخدم التعلم الآلي للتداول في العملات المشفرة عبر منصة بايننس.
 
+## خطوات التثبيت
+
+1. تثبيت Python 3.11:
+```bash
+sudo apt update
+sudo apt install python3.11 python3.11-dev
+```
+
+2. تثبيت MongoDB:
+```bash
+sudo apt install mongodb
+sudo systemctl start mongodb
+```
+
+3. إنشاء بيئة افتراضية وتفعيلها:
+```bash
+python3.11 -m venv venv
+source venv/bin/activate  # لنظام Linux/Mac
+# أو
+.\venv\Scripts\activate  # لنظام Windows
+```
+
+4. تثبيت المكتبات المطلوبة:
+```bash
+pip install ccxt pandas pandas-ta numpy scikit-learn pymongo streamlit plotly
+```
+
+5. تعيين المتغيرات البيئية:
+```bash
+export BINANCE_API_KEY='your_api_key'
+export BINANCE_API_SECRET='your_api_secret'
+export MONGODB_URL='mongodb://localhost:27017/'
+export NEWS_API_KEY='your_news_api_key'  # اختياري
+```
+
+6. تشغيل النظام:
+```bash
+# تشغيل نظام التداول
+cd src
+PYTHONPATH=. python main.py
+
+# تشغيل واجهة المستخدم
+cd src
+PYTHONPATH=. streamlit run run_dashboard.py
+```
+
 ## المتطلبات الأساسية
 
 1. Python 3.11
@@ -40,28 +86,6 @@ src/
 3. نتائج التحليل الفني
 4. معلومات التداولات
 
-
-## كيفية التشغيل
-
-1. تشغيل نظام التداول:
-```bash
-cd src
-PYTHONPATH=. python main.py
-```
-
-2. تشغيل واجهة المستخدم:
-```bash
-cd src
-PYTHONPATH=. streamlit run run_dashboard.py
-```
-
-## المتغيرات البيئية المطلوبة
-
-- BINANCE_API_KEY: مفتاح API لمنصة Binance
-- BINANCE_API_SECRET: كلمة السر لمنصة Binance
-- MONGODB_URL: رابط الاتصال بقاعدة البيانات MongoDB
-- NEWS_API_KEY: مفتاح API لخدمة الأخبار (اختياري)
-
 ## الوظائف الرئيسية
 
 1. جمع وتحليل بيانات السوق بشكل مستمر
@@ -76,3 +100,4 @@ PYTHONPATH=. streamlit run run_dashboard.py
 - يمكن استخدام وضع المحاكاة للتجربة بدون مفاتيح API حقيقية
 - يجب التأكد من إعداد قاعدة البيانات MongoDB قبل التشغيل
 - يمكن تعديل إعدادات التداول في ملف config.py
+- للتشغيل في وضع المحاكاة، لا يلزم تعيين مفاتيح API
